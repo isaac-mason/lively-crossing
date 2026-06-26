@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="An interactive Gaussian-splat city scene: a first-person character, physics, and a navmesh on a Spark splat."
+    />
+    <title>lively-crossing</title>
+    <!-- Loader styles inlined so the overlay is styled on first paint (no flash
+         of unstyled content before the bundled CSS loads). -->
+    <style>
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 45%, #0b1020 0%, #04060c 70%);
+        transition: opacity 0.6s ease;
+      }
+      #loading.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #loading .spinner {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: 4px solid rgba(120, 160, 255, 0.2);
+        border-top-color: #7aa0ff;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="loading">
+      <div class="spinner" role="img" aria-label="Loading"></div>
+    </div>
+    <script type="module" src="/src/index.ts"></script>
+  </body>
+</html>
