@@ -200,7 +200,12 @@ export function createDebugOverlay(perf: Performance): DebugOverlay {
         perf.lodScale = value;
     });
 
-    element.append(orbitCheckbox, physicsCheckbox, navmeshCheckbox, lodSlider, overlay.text);
+    // Min on-screen splat size (px). Higher = fewer tiny splats = lower active count.
+    const renderScaleSlider = createRange('lod px', { min: 1, max: 5, step: 0.25, value: perf.lodRenderScale }, (value) => {
+        perf.lodRenderScale = value;
+    });
+
+    element.append(orbitCheckbox, physicsCheckbox, navmeshCheckbox, lodSlider, renderScaleSlider, overlay.text);
     document.body.appendChild(element);
 
     window.addEventListener('keydown', (event) => {

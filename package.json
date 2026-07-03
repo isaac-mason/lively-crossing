@@ -17,16 +17,17 @@
         "lint": "biome check .",
         "format": "biome format --write .",
         "check": "biome check --write .",
-        "splat:collider-glb": "tsx scripts/splat-to-collider-glb.ts",
+        "splat:collider-glb": "tsx scripts/build-collider-glb.ts",
         "build:collider": "tsx scripts/build-collider.ts",
-        "build:navmesh": "tsx scripts/build-navmesh.ts"
+        "build:navmesh": "tsx scripts/build-navmesh.ts",
+        "screenshot": "node scripts/screenshot.mjs"
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.0",
         "@gltf-transform/core": "^4.4.0",
-        "@playcanvas/splat-transform": "^2.7.0",
         "@types/three": "^0.184.1",
         "playcanvas": "^2.20.0",
+        "playwright-core": "^1.61.1",
         "tsx": "^4.22.4",
         "typescript": "~6.0.2",
         "vite": "^8.0.12"

@@ -9,7 +9,7 @@ import { getMoveDirection, initFirstPersonControls, releaseFirstPersonControls, 
 import { initCrowd, spawnCrowd, updateCrowdMeshes } from './crowd';
 import { attachDebugRaycast, createDebugOverlay, updateDebugOverlay, updatePhysicsDebug } from './debug';
 import { initNavigation, loadNavigation, updateCrowd, updateNavigation } from './navigation';
-import { applyPerformance, initPerformance } from './performance';
+import { applyPerformance, getSparkQualityOptions, initPerformance } from './performance';
 import { createSplatCollider, initPhysics, updatePhysics } from './physics';
 import { CAMERA_POSITION, CAMERA_TARGET, COLLIDER_URL, SPLAT_URL } from './scene';
 import { WORLD_SCALE } from './world-scale';
@@ -42,6 +42,8 @@ function init() {
         coneFov0: 120,
         coneFov: 160,
         coneFoveate: 0.5,
+        // Per-platform LOD paging + spread budget (iOS < other mobile < desktop).
+        ...getSparkQualityOptions(),
     });
     scene.add(spark);
 

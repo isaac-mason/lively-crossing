@@ -27,3 +27,6 @@ dist-ssr
 assets/*.collision.glb
 assets/*.voxel.json
 assets/*.voxel.bin
+
+# LLM throwaway diagnostic/tuning scripts
+llm/

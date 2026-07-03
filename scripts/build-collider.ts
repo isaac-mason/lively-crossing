@@ -17,7 +17,7 @@ import { WORLD_SCALE } from '../src/world-scale.ts';
 
 const TRIANGLES = 4; // glTF primitive mode
 
-const INPUT = process.argv[2] ?? 'assets/colliders.glb';
+const INPUT = process.argv[2] ?? 'assets/anime-city.collision.glb';
 const OUTPUT = process.argv[3] ?? 'public/collider.bin';
 
 async function main() {
@@ -56,6 +56,8 @@ async function main() {
                 const y = src[i * 3 + 1];
                 const z = src[i * 3 + 2];
                 // Bake in the uniform world scale so collider, navmesh and splat align.
+                // The collider GLB is already world-frame + cropped (built by
+                // scripts/splat-to-collider-glb.ts), so this is a straight copy.
                 world[i * 3] = (m[0] * x + m[4] * y + m[8] * z + m[12]) * WORLD_SCALE;
                 world[i * 3 + 1] = (m[1] * x + m[5] * y + m[9] * z + m[13]) * WORLD_SCALE;
                 world[i * 3 + 2] = (m[2] * x + m[6] * y + m[10] * z + m[14]) * WORLD_SCALE;

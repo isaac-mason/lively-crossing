@@ -35,11 +35,14 @@ import { WORLD_SCALE } from '../src/world-scale.ts';
 // --- Pruning: keep only polys reachable from a seed point AND within a radius ---
 // Seed sits at the intersection the player/crowd use; everything not connected to
 // it (or too far away) is dropped so the navmesh is a tidy bubble around the area.
-const PRUNE_SEED: Vec3 = [-2.13, 1.29, -2.47];
-const PRUNE_RADIUS = 30; // metres — poly centres beyond this from the seed are pruned
+// Seed sits on the connected ground plaza (Y≈0, footprint X[-24,13] Z[-14,17])
+// that the op0.3 + filter-floaters collider produces. Flood-fill from here keeps
+// the walkable plaza and drops the disconnected rooftop + far pockets.
+const PRUNE_SEED: Vec3 = [-5, 0, 1];
+const PRUNE_RADIUS = 90; // metres — flood-fill keeps only connected walkable street within this
 const SEED_FIND_HALF_EXTENTS: Vec3 = [4, 8, 4]; // search box for locating the seed poly
 
-const INPUT = process.argv[2] ?? 'assets/colliders.glb';
+const INPUT = process.argv[2] ?? 'assets/anime-city.collision.glb';
 const OUTPUT = process.argv[3] ?? 'public/navmesh.json';
 
 /* -------------------------------------------------------------------------- */
@@ -256,7 +259,8 @@ async function main() {
                 const y = src[i * 3 + 1];
                 const z = src[i * 3 + 2];
                 // Bake in the uniform world scale so the navmesh matches the
-                // scaled collider + splat (see src/world-scale.ts).
+                // scaled collider + splat (see src/world-scale.ts). The collider GLB
+                // is already world-frame + cropped, so this is a straight copy.
                 positions.push((m[0] * x + m[4] * y + m[8] * z + m[12]) * WORLD_SCALE);
                 positions.push((m[1] * x + m[5] * y + m[9] * z + m[13]) * WORLD_SCALE);
                 positions.push((m[2] * x + m[6] * y + m[10] * z + m[14]) * WORLD_SCALE);
@@ -275,14 +279,19 @@ async function main() {
     /* generate solo navmesh */
 
     // cellSize = horizontal voxel size; cellHeight = vertical. Kept coarse enough
-    // that the generator's span arrays don't overflow on a mesh this large (going
-    // too fine triggers V8 "invalid table size"). Ground-hugging is handled by the
-    // detail sample params below.
-    const cs = 0.05;
-    const ch = 0.03;
+    // that the generator's span arrays don't overflow on a mesh this large (0.05
+    // gives a ~1940x1420 heightfield over the ~97x71 collider and triggers V8
+    // "invalid table size"). 0.2 -> ~485x355, plenty for a walkable street;
+    // ground-hugging is handled by the detail sample params below.
+    const cs = 0.2;
+    const ch = 0.1;
 
     const walkableRadiusWorld = 0.1;
-    const walkableClimbWorld = 0.2;
+    // The floor-fill ground is voxel-stepped, so too small a climb leaves it a
+    // field of disconnected bumps. 0.4 (curb height) lets the agent step over the
+    // voxel steps so the plaza connects (ground polys ~92 -> ~168); larger
+    // plateaus and starts merging onto curbs/low walls, so 0.4 is the sweet spot.
+    const walkableClimbWorld = 0.4;
     const walkableHeightWorld = 1;
 
     const options: SoloNavMeshOptions = {
