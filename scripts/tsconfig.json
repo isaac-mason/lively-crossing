@@ -1,0 +1,12 @@
+{
+    // Node-side build scripts. Inherits the root config but swaps browser (vite)
+    // types for Node types, so `node:*` imports and `process` resolve here.
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "types": ["node", "vite/client"],
+        // These are throwaway asset/tuning tools; don't fail on unused tuning vars.
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
+    },
+    "include": ["**/*.ts"]
+}

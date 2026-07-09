@@ -1,16 +1,10 @@
 import type { SparkRenderer } from '@sparkjsdev/spark';
-import { debug as ccDebug, kcc, type World } from 'crashcat';
+import { debug as ccDebug, type World } from 'crashcat';
 import * as THREE from 'three';
 
-import type { Character } from './character';
 import type { Performance } from './performance';
-
-const GROUND_STATE_NAMES: Record<number, string> = {
-    [kcc.GroundState.ON_GROUND]: 'on ground',
-    [kcc.GroundState.ON_STEEP_GROUND]: 'on steep',
-    [kcc.GroundState.NOT_SUPPORTED]: 'not supported',
-    [kcc.GroundState.IN_AIR]: 'in air',
-};
+import { WIND_SPHERES } from './wind';
+import { WORLD_SCALE } from './world-scale';
 
 export type DebugOverlay = {
     element: HTMLDivElement;
@@ -18,10 +12,8 @@ export type DebugOverlay = {
     text: HTMLDivElement;
     /** Per-line value spans updated each frame; the coord ones are click-to-copy. */
     fields: {
-        mode: HTMLSpanElement;
         cam: HTMLSpanElement;
-        feet: HTMLSpanElement;
-        ground: HTMLSpanElement;
+        look: HTMLSpanElement;
         hit: HTMLSpanElement;
         splats: HTMLSpanElement;
     };
@@ -31,8 +23,10 @@ export type DebugOverlay = {
     showPhysics: boolean;
     /** Whether the navmesh wireframe is drawn (toggled by the checkbox). */
     showNavMesh: boolean;
-    /** Camera mode: true = free orbit camera, false = first-person character. */
-    orbitMode: boolean;
+    /** Whether the authored wind spheres are drawn (toggled by the checkbox). */
+    showWindSpheres: boolean;
+    /** Wireframe spheres visualizing WIND_SPHERES (src/wind.ts). Add to your scene. */
+    windSpheres: THREE.Group;
     /** Line segments rendering the crashcat physics debug wireframe. Add to your scene. */
     physicsLines: THREE.LineSegments;
     /** Raycaster used for click-to-raycast against the scene. */
@@ -135,6 +129,28 @@ export function createDebugOverlay(perf: Performance): DebugOverlay {
     physicsLines.visible = false;
     physicsLines.frustumCulled = false; // geometry is rebuilt each frame; skip culling
 
+    // Wireframe spheres visualizing the authored wind volumes. Positions/radii are
+    // in native splat units, so scale into world space to match the rendered splat.
+    const windSpheres = new THREE.Group();
+    windSpheres.visible = false;
+    // transparent:true so it renders in the post-opaque pass, *after* the
+    // alpha-blended splats; depthTest/Write off + high renderOrder keep it drawn
+    // on top of everything regardless of scene depth.
+    const windSphereMat = new THREE.MeshBasicMaterial({
+        color: 0x33ddff,
+        wireframe: true,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+    });
+    for (const s of WIND_SPHERES) {
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(s.radius * WORLD_SCALE, 20, 14), windSphereMat);
+        sphere.position.set(s.center[0] * WORLD_SCALE, s.center[1] * WORLD_SCALE, s.center[2] * WORLD_SCALE);
+        sphere.renderOrder = 999;
+        sphere.raycast = () => {}; // don't let click-to-raycast hit the debug volume
+        windSpheres.add(sphere);
+    }
+
     // Marker drawn at the last raycast hit. Non-raycastable so clicks don't hit it.
     const raycastMarker = new THREE.Mesh(
         new THREE.SphereGeometry(0.05, 16, 12),
@@ -145,47 +161,38 @@ export function createDebugOverlay(perf: Performance): DebugOverlay {
     raycastMarker.frustumCulled = false;
     raycastMarker.raycast = () => {};
 
-    // Readout rows. The three Vec3 lines (cam / feet / hit) are click-to-copy.
+    // Readout rows. The Vec3 lines (cam / look / hit) are click-to-copy — cam +
+    // look give you the orbit camera's pose to paste back.
     const text = document.createElement('div');
     text.style.cssText = 'display:flex;flex-direction:column';
-    const modeRow = createReadoutRow('mode');
     const camRow = createReadoutRow('cam');
-    const feetRow = createReadoutRow('feet');
+    const lookRow = createReadoutRow('look');
     const hitRow = createReadoutRow('hit');
     const splatsRow = createReadoutRow('splats');
     makeCopyable(camRow.value);
+    makeCopyable(lookRow.value);
     makeCopyable(hitRow.value);
-    makeCopyable(feetRow.value);
-    // The feet row shows the ground state after the (copyable) coords, so split it
-    // into a copyable coord span plus a plain suffix span.
-    const groundSpan = document.createElement('span');
-    feetRow.row.append(groundSpan);
-    text.append(modeRow.row, camRow.row, feetRow.row, hitRow.row, splatsRow.row);
+    text.append(camRow.row, lookRow.row, hitRow.row, splatsRow.row);
 
     const overlay: DebugOverlay = {
         element,
         text,
         fields: {
-            mode: modeRow.value,
             cam: camRow.value,
-            feet: feetRow.value,
-            ground: groundSpan,
+            look: lookRow.value,
             hit: hitRow.value,
             splats: splatsRow.value,
         },
         enabled: false,
         showPhysics: false,
         showNavMesh: false,
-        orbitMode: false,
+        showWindSpheres: false,
+        windSpheres,
         physicsLines,
         raycaster: new THREE.Raycaster(),
         raycastMarker,
         lastHit: null,
     };
-
-    const orbitCheckbox = createCheckbox('orbit camera', (checked) => {
-        overlay.orbitMode = checked;
-    });
 
     const physicsCheckbox = createCheckbox('physics debug', (checked) => {
         overlay.showPhysics = checked;
@@ -194,6 +201,11 @@ export function createDebugOverlay(perf: Performance): DebugOverlay {
 
     const navmeshCheckbox = createCheckbox('navmesh debug', (checked) => {
         overlay.showNavMesh = checked;
+    });
+
+    const windSphereCheckbox = createCheckbox('wind sphere debug', (checked) => {
+        overlay.showWindSpheres = checked;
+        windSpheres.visible = checked;
     });
 
     const lodSlider = createRange('lod scale', { min: 0.2, max: 2, step: 0.05, value: perf.lodScale }, (value) => {
@@ -205,7 +217,7 @@ export function createDebugOverlay(perf: Performance): DebugOverlay {
         perf.lodRenderScale = value;
     });
 
-    element.append(orbitCheckbox, physicsCheckbox, navmeshCheckbox, lodSlider, renderScaleSlider, overlay.text);
+    element.append(physicsCheckbox, navmeshCheckbox, windSphereCheckbox, lodSlider, renderScaleSlider, overlay.text);
     document.body.appendChild(element);
 
     window.addEventListener('keydown', (event) => {
@@ -250,22 +262,18 @@ export function attachDebugRaycast(
 export function updateDebugOverlay(
     overlay: DebugOverlay,
     camera: THREE.PerspectiveCamera,
-    character: Character,
+    target: THREE.Vector3,
     spark: SparkRenderer,
 ): void {
     if (!overlay.enabled) return;
 
     const p = camera.position;
-    const c = character.kcc.position;
     const h = overlay.lastHit;
-    const ground = GROUND_STATE_NAMES[character.kcc.ground.state] ?? '?';
     const active = spark.activeSplats.toLocaleString();
     const max = spark.maxSplats.toLocaleString();
     const f = overlay.fields;
-    f.mode.textContent = overlay.orbitMode ? 'orbit' : 'first-person';
     f.cam.textContent = `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}`;
-    f.feet.textContent = `${c[0].toFixed(2)}, ${c[1].toFixed(2)}, ${c[2].toFixed(2)}`;
-    f.ground.textContent = `  (${ground})`;
+    f.look.textContent = `${target.x.toFixed(2)}, ${target.y.toFixed(2)}, ${target.z.toFixed(2)}`;
     f.hit.textContent = h ? `${h.x.toFixed(2)}, ${h.y.toFixed(2)}, ${h.z.toFixed(2)}` : '-';
     f.splats.textContent = `${active} / ${max}  (lod x${spark.lodSplatScale.toFixed(2)})`;
 }

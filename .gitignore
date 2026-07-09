@@ -30,3 +30,6 @@ assets/*.voxel.bin
 
 # LLM throwaway diagnostic/tuning scripts
 llm/
+
+# Vendored Spark source (cloned by scripts/build-lod.sh)
+vendor/

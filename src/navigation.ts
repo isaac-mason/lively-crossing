@@ -4,6 +4,7 @@ import {
     createNavMesh,
     DEFAULT_QUERY_FILTER,
     findNearestPoly,
+    findRandomPoint,
     type NavMesh,
     type NavMeshTile,
     type Vec3,
@@ -75,13 +76,23 @@ export function makeAgentParams(radius: number, height: number, maxSpeed: number
         maxAcceleration: maxSpeed * 8,
         maxSpeed,
         collisionQueryRange: radius * 6,
-        separationWeight: 1,
+        separationWeight: 2,
         updateFlags:
             crowd.CrowdUpdateFlags.ANTICIPATE_TURNS |
             crowd.CrowdUpdateFlags.OBSTACLE_AVOIDANCE |
             crowd.CrowdUpdateFlags.SEPARATION |
             crowd.CrowdUpdateFlags.OPTIMIZE_VIS |
             crowd.CrowdUpdateFlags.OPTIMIZE_TOPO,
+        // Bias avoidance toward committing to a side and sampling more finely, so
+        // two agents meeting head-on veer past each other instead of mirror-matching
+        // into a dead stop. `weightSide` (default 0.75) is the main anti-stalemate
+        // lever; the extra adaptive rings/depth make the chosen dodge smoother.
+        obstacleAvoidance: {
+            ...crowd.DEFAULT_OBSTACLE_AVOIDANCE_PARAMS,
+            weightSide: 2,
+            adaptiveRings: 3,
+            adaptiveDepth: 7,
+        },
         queryFilter: DEFAULT_QUERY_FILTER,
     };
 }
@@ -104,6 +115,18 @@ export function snapToNavMesh(navigation: Navigation, point: Vec3, out: Vec3): b
     out[0] = _nearest.position[0];
     out[1] = _nearest.position[1];
     out[2] = _nearest.position[2];
+    return true;
+}
+
+// Pick a uniformly-random walkable point anywhere on the navmesh (within the
+// connected, pruned street network). Writes into `out`; false if no navmesh.
+export function randomNavMeshPoint(navigation: Navigation, out: Vec3): boolean {
+    if (!navigation.navMesh) return false;
+    const res = findRandomPoint(navigation.navMesh, DEFAULT_QUERY_FILTER, Math.random);
+    if (!res.success) return false;
+    out[0] = res.position[0];
+    out[1] = res.position[1];
+    out[2] = res.position[2];
     return true;
 }
 

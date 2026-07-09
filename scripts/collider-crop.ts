@@ -3,17 +3,16 @@
  *
  * The voxel collider baked from the full splat captures far-away buildings and
  * tall sky floaters we never interact with. Cropping to a box around the
- * playable area trims that junk, shrinks collider.bin, and keeps the navmesh
+ * playable area trims that junk, shrinks collider.glb, and keeps the navmesh
  * heightfield small enough to build.
  *
- * The box is in WORLD space — the same frame as src/scene.ts, public/collider.bin
- * and the rendered splat. splat-to-collider-glb.ts applies the 180°-about-Y fix
+ * The box is in WORLD space — the same frame as src/scene.ts, public/collider.glb
+ * and the rendered splat. generate-collision-mesh.ts applies the 180°-about-Y fix
  * before cropping, so this box is expressed directly in world coordinates. The
  * full splat spans roughly:
  *   X [-288, 300]   Y [-10, 296]   Z [-152, 84]
  * Most of the Y range and the X/Z tails are scenery/floaters. Tighten these six
- * numbers to taste — the alignment page (verify-align.html) draws this box over
- * the splat so you can see what's kept.
+ * numbers to taste to control what the collider/navmesh bake keeps.
  *
  * Set CROP to null to disable cropping (capture everything).
  */
@@ -24,7 +23,7 @@
 // Box around the actual playable area, taken from the (known-good) navmesh
 // footprint — X[-35,27] Z[-18,9] Y[-1,2], centre ≈ (-4, -4) — with ~15 units of
 // horizontal margin to catch the walls/buildings lining the street, and Y from
-// below the floor up to wall height. verify-align.html draws this over the splat.
+// below the floor up to wall height.
 // Y is deliberately shallow: a first-person walker only needs collision from just
 // below the ground up to a bit over head height. Capping max.y at ~6 drops all the
 // building tops / tree canopies / high floaters — ~60% of the triangles here — at

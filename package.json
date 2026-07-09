@@ -2,7 +2,7 @@
     "name": "lively-crossing",
     "private": true,
     "version": "0.0.0",
-    "description": "An interactive Gaussian-splat city scene: a first-person character (KCC), physics, and a navmesh on a Spark splat.",
+    "description": "An interactive Gaussian-splat city crossing: wind-swayed trees and a navmesh crowd of pedestrians, on a Spark splat in the browser.",
     "license": "MIT",
     "author": "Isaac Mason",
     "type": "module",
@@ -17,33 +17,32 @@
         "lint": "biome check .",
         "format": "biome format --write .",
         "check": "biome check --write .",
-        "splat:collider-glb": "tsx scripts/build-collider-glb.ts",
-        "build:collider": "tsx scripts/build-collider.ts",
+        "generate:collision-mesh": "tsx scripts/generate-collision-mesh.ts",
+        "build:collision-mesh-glb": "tsx scripts/build-collision-mesh-glb.ts",
         "build:navmesh": "tsx scripts/build-navmesh.ts",
-        "screenshot": "node scripts/screenshot.mjs"
+        "build:lod": "scripts/build-lod.sh",
+        "screenshot": "node scripts/screenshot.mjs",
+        "assets:optimize": "tsx scripts/optimize-glb.ts"
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.0",
-        "@gltf-transform/core": "^4.4.0",
-        "@types/three": "^0.184.1",
+        "@gltf-transform/core": "^4.4.1",
+        "@gltf-transform/extensions": "4.4.1",
+        "@gltf-transform/functions": "4.4.1",
+        "@types/node": "^26.1.1",
+        "@types/three": "^0.185.0",
+        "meshoptimizer": "^1.2.0",
         "playcanvas": "^2.20.0",
         "playwright-core": "^1.61.1",
         "tsx": "^4.22.4",
         "typescript": "~6.0.2",
         "vite": "^8.0.12"
     },
-    "pnpm": {
-        "onlyBuiltDependencies": [
-            "esbuild",
-            "webgpu"
-        ]
-    },
     "dependencies": {
         "@sparkjsdev/spark": "^2.1.0",
-        "crashcat": "^0.0.4",
-        "mathcat": "0.0.11",
+        "crashcat": "^0.0.5",
+        "mathcat": "0.0.13",
         "navcat": "^0.4.1",
-        "packcat": "^0.3.0",
-        "three": "^0.184.0"
+        "three": "^0.185.1"
     }
 }

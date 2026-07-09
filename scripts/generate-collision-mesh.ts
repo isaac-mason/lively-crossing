@@ -1,24 +1,27 @@
 /**
- * Native collider pipeline: splat -> crop -> voxel density -> smooth iso-surface.
+ * Generate the collision mesh: splat -> crop -> voxel density -> smooth iso-surface.
  *
  * Read the .spz directly (positions + opacity), bin splat centres into a density
  * grid, blur it, then extract a SMOOTH iso-surface with Surface Nets (a marching-
  * cubes-family dual method): vertices are interpolated onto the density crossing,
  * so slopes/hills come out sloped (not blocky 90° voxel steps) and the floor sits
  * at the actual splat surface rather than the top of a voxel. No fabricated walls,
- * no classification — the collider is exactly the surface of the splat.
+ * no classification — the mesh is exactly the surface of the splat.
  *
  * The .spz native coords are Spark's render/world frame (verified: Spark's splat
  * bounds equal the raw .spz bounds), so no rotation — output is world-frame.
  *
- * Usage: pnpm splat:collider-glb [in.spz] [out.glb] [voxel] [alpha] [iso]
+ * Output (assets/anime-city.collision.glb) is the shared collision mesh, consumed
+ * by build-collision-mesh-glb.ts (runtime collider) and build-navmesh.ts (navmesh).
+ *
+ * Usage: pnpm generate:collision-mesh [in.spz] [out.glb] [voxel] [alpha] [iso]
  */
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { CROP } from './collider-crop.ts';
 
-const INPUT = process.argv[2] ?? 'public/anime-city.spz';
+const INPUT = process.argv[2] ?? 'assets/anime-city.spz';
 const OUTPUT = process.argv[3] ?? 'assets/anime-city.collision.glb';
 // Recast-style anisotropic grid: coarse horizontal cell size (CS), FINE vertical
 // cell height (CH). Fine CH resolves the ground's vertical density gradient
@@ -33,7 +36,7 @@ const BLUR = 1; // horizontal (XZ) box-blur radius on the density field (smooths
 // offset the small upward creep from Taubin smoothing.
 const GROUND_OFFSET = Number(process.argv[7] ?? -0.1);
 
-if (!CROP) throw new Error('build-collider-glb: CROP box is required');
+if (!CROP) throw new Error('generate-collision-mesh: CROP box is required');
 const { min, max } = CROP;
 const nx = Math.ceil((max[0] - min[0]) / CS);
 const ny = Math.ceil((max[1] - min[1]) / CH);
@@ -61,7 +64,9 @@ let kept = 0;
 for (let i = 0; i < num; i++) {
     if (buf[alphaOff + i] < ALPHA_MIN) continue;
     const o = posOff + i * 9;
-    const x = rd(o), y = rd(o + 3), z = rd(o + 6);
+    const x = rd(o),
+        y = rd(o + 3),
+        z = rd(o + 6);
     if (x < min[0] || x >= max[0] || y < min[1] || y >= max[1] || z < min[2] || z >= max[2]) continue;
     const ix = ((x - min[0]) / CS) | 0;
     const iy = ((y - min[1]) / CH) | 0;
@@ -77,10 +82,12 @@ if (BLUR > 0) {
     for (let iz = 0; iz < nz; iz++) {
         for (let iy = 0; iy < ny; iy++) {
             for (let ix = 0; ix < nx; ix++) {
-                let s = 0, c = 0;
+                let s = 0,
+                    c = 0;
                 for (let dz = -BLUR; dz <= BLUR; dz++) {
                     for (let dx = -BLUR; dx <= BLUR; dx++) {
-                        const jx = ix + dx, jz = iz + dz;
+                        const jx = ix + dx,
+                            jz = iz + dz;
                         if (jx < 0 || jx >= nx || jz < 0 || jz >= nz) continue;
                         s += counts[fidx(jx, iy, jz)];
                         c++;
@@ -105,7 +112,10 @@ if (CUTOFF_M > 0) {
         for (let ix = 0; ix < nx; ix++) {
             let g = -1;
             for (let iy = 0; iy < ny; iy++) {
-                if (field[fidx(ix, iy, iz)] >= ISO) { g = iy; break; }
+                if (field[fidx(ix, iy, iz)] >= ISO) {
+                    g = iy;
+                    break;
+                }
             }
             const top = g >= 0 ? g + cutoffVox : -1;
             for (let iy = top + 1; iy < ny; iy++) field[fidx(ix, iy, iz)] = 0;
@@ -117,7 +127,7 @@ if (CUTOFF_M > 0) {
 //         ground is a thin surface too, so erosion damages the street. ---
 const OPEN = 0; // morphological opening disabled (erodes the thin ground surface)
 if (OPEN > 0) {
-    const morph = (src: Float32Array, pick: (a: number, b: number) => number): Float32Array => {
+    const morph = (src: Float32Array, pick: (a: number, b: number) => number) => {
         const out = new Float32Array(src.length);
         for (let iz = 0; iz < nz; iz++) {
             for (let iy = 0; iy < ny; iy++) {
@@ -126,9 +136,11 @@ if (OPEN > 0) {
                     for (let dz = -OPEN; dz <= OPEN; dz++) {
                         for (let dy = -OPEN; dy <= OPEN; dy++) {
                             for (let dx = -OPEN; dx <= OPEN; dx++) {
-                                const jx = ix + dx, jy = iy + dy, jz = iz + dz;
-                                const s = jx < 0 || jx >= nx || jy < 0 || jy >= ny || jz < 0 || jz >= nz
-                                    ? 0 : src[fidx(jx, jy, jz)];
+                                const jx = ix + dx,
+                                    jy = iy + dy,
+                                    jz = iz + dz;
+                                const s =
+                                    jx < 0 || jx >= nx || jy < 0 || jy >= ny || jz < 0 || jz >= nz ? 0 : src[fidx(jx, jy, jz)];
                                 acc = pick(acc, s);
                             }
                         }
@@ -160,7 +172,10 @@ if (SPAN_FILL > 0) {
         for (let ix = 0; ix < nx; ix++) {
             let top = -1;
             for (let iy = ny - 1; iy >= 0; iy--) {
-                if (field[fidx(ix, iy, iz)] >= ISO) { top = iy; break; }
+                if (field[fidx(ix, iy, iz)] >= ISO) {
+                    top = iy;
+                    break;
+                }
             }
             for (let iy = 0; iy < ny; iy++) field[fidx(ix, iy, iz)] = iy <= top ? SOLID : 0;
         }
@@ -176,7 +191,10 @@ const edgeTable = new Int32Array(256);
     for (let i = 0; i < 8; i++) {
         for (let j = 1; j <= 4; j <<= 1) {
             const p = i ^ j;
-            if (i <= p) { cubeEdges[k++] = i; cubeEdges[k++] = p; }
+            if (i <= p) {
+                cubeEdges[k++] = i;
+                cubeEdges[k++] = p;
+            }
         }
     }
     for (let i = 0; i < 256; i++) {
@@ -202,7 +220,9 @@ for (x[2] = 0; x[2] < dims[2] - 1; x[2]++, n += dims[0], bufNo ^= 1, R[2] = -R[2
     let m = 1 + (dims[0] + 1) * (1 + bufNo * (dims[1] + 1));
     for (x[1] = 0; x[1] < dims[1] - 1; x[1]++, n++, m += 2) {
         for (x[0] = 0; x[0] < dims[0] - 1; x[0]++, n++, m++) {
-            let mask = 0, g = 0, idx = n;
+            let mask = 0,
+                g = 0,
+                idx = n;
             for (let k = 0; k < 2; k++, idx += dims[0] * (dims[1] - 2)) {
                 for (let j = 0; j < 2; j++, idx += dims[0] - 2) {
                     for (let i = 0; i < 2; i++, g++, idx++) {
@@ -221,11 +241,14 @@ for (x[2] = 0; x[2] < dims[2] - 1; x[2]++, n += dims[0], bufNo ^= 1, R[2] = -R[2
                 eCount++;
                 const e0 = cubeEdges[i << 1];
                 const e1 = cubeEdges[(i << 1) + 1];
-                const g0 = grid[e0], g1 = grid[e1];
+                const g0 = grid[e0],
+                    g1 = grid[e1];
                 let t = g0 - g1;
-                if (Math.abs(t) > 1e-6) t = g0 / t; else continue;
+                if (Math.abs(t) > 1e-6) t = g0 / t;
+                else continue;
                 for (let j = 0, k = 1; j < 3; j++, k <<= 1) {
-                    const a = e0 & k, b = e1 & k;
+                    const a = e0 & k,
+                        b = e1 & k;
                     if (a !== b) vv[j] += a ? 1.0 - t : t;
                     else vv[j] += a ? 1.0 : 0.0;
                 }
@@ -236,10 +259,15 @@ for (x[2] = 0; x[2] < dims[2] - 1; x[2]++, n += dims[0], bufNo ^= 1, R[2] = -R[2
             positions.push(min[0] + (vv[0] + 0.5) * CS, min[1] + (vv[1] + 0.5) * CH + GROUND_OFFSET, min[2] + (vv[2] + 0.5) * CS);
             for (let i = 0; i < 3; i++) {
                 if (!(edgeMask & (1 << i))) continue;
-                const iu = (i + 1) % 3, iv = (i + 2) % 3;
+                const iu = (i + 1) % 3,
+                    iv = (i + 2) % 3;
                 if (x[iu] === 0 || x[iv] === 0) continue;
-                const du = R[iu], dv = R[iv];
-                const a = buffer[m], b = buffer[m - du], c = buffer[m - du - dv], e = buffer[m - dv];
+                const du = R[iu],
+                    dv = R[iv];
+                const a = buffer[m],
+                    b = buffer[m - du],
+                    c = buffer[m - du - dv],
+                    e = buffer[m - dv];
                 if (mask & 1) indices.push(a, e, c, a, c, b);
                 else indices.push(a, b, c, a, c, e);
             }
@@ -257,15 +285,32 @@ if (SMOOTH_ITERS > 0 && indices.length > 0) {
     const frozen = new Uint8Array(nV);
     const nbr: Set<number>[] = Array.from({ length: nV }, () => new Set<number>());
     for (let t = 0; t < indices.length; t += 3) {
-        const a = indices[t], b = indices[t + 1], c = indices[t + 2];
-        nbr[a].add(b); nbr[a].add(c); nbr[b].add(a); nbr[b].add(c); nbr[c].add(a); nbr[c].add(b);
+        const a = indices[t],
+            b = indices[t + 1],
+            c = indices[t + 2];
+        nbr[a].add(b);
+        nbr[a].add(c);
+        nbr[b].add(a);
+        nbr[b].add(c);
+        nbr[c].add(a);
+        nbr[c].add(b);
         // face normal.y -> freeze steep (wall) vertices
-        const pa = a * 3, pb = b * 3, pc = c * 3;
-        const ux = positions[pb] - positions[pa], uy = positions[pb + 1] - positions[pa + 1], uz = positions[pb + 2] - positions[pa + 2];
-        const vx = positions[pc] - positions[pa], vy = positions[pc + 1] - positions[pa + 1], vz = positions[pc + 2] - positions[pa + 2];
-        let ny = uz * vx - ux * vz;
+        const pa = a * 3,
+            pb = b * 3,
+            pc = c * 3;
+        const ux = positions[pb] - positions[pa],
+            uy = positions[pb + 1] - positions[pa + 1],
+            uz = positions[pb + 2] - positions[pa + 2];
+        const vx = positions[pc] - positions[pa],
+            vy = positions[pc + 1] - positions[pa + 1],
+            vz = positions[pc + 2] - positions[pa + 2];
+        const ny = uz * vx - ux * vz;
         const L = Math.hypot(uy * vz - uz * vy, ny, ux * vy - uy * vx) || 1;
-        if (Math.abs(ny / L) < 0.5) { frozen[a] = 1; frozen[b] = 1; frozen[c] = 1; }
+        if (Math.abs(ny / L) < 0.5) {
+            frozen[a] = 1;
+            frozen[b] = 1;
+            frozen[c] = 1;
+        }
     }
     const nbrArr = nbr.map((s) => [...s]);
     const pass = (factor: number) => {
@@ -274,8 +319,14 @@ if (SMOOTH_ITERS > 0 && indices.length > 0) {
             if (frozen[v]) continue;
             const ns = nbrArr[v];
             if (ns.length === 0) continue;
-            let sx = 0, sy = 0, sz = 0;
-            for (const w of ns) { sx += positions[w * 3]; sy += positions[w * 3 + 1]; sz += positions[w * 3 + 2]; }
+            let sx = 0,
+                sy = 0,
+                sz = 0;
+            for (const w of ns) {
+                sx += positions[w * 3];
+                sy += positions[w * 3 + 1];
+                sz += positions[w * 3 + 2];
+            }
             const n = ns.length;
             out[v * 3] = positions[v * 3] + factor * (sx / n - positions[v * 3]);
             out[v * 3 + 1] = positions[v * 3 + 1] + factor * (sy / n - positions[v * 3 + 1]);
@@ -283,7 +334,10 @@ if (SMOOTH_ITERS > 0 && indices.length > 0) {
         }
         for (let i = 0; i < positions.length; i++) positions[i] = out[i];
     };
-    for (let i = 0; i < SMOOTH_ITERS; i++) { pass(0.5); pass(-0.53); }
+    for (let i = 0; i < SMOOTH_ITERS; i++) {
+        pass(0.5);
+        pass(-0.53);
+    }
 }
 
 // --- 4. Write GLB (world frame). ---
@@ -296,5 +350,7 @@ doc.createScene().addChild(doc.createNode().setMesh(doc.createMesh().addPrimitiv
 await new NodeIO().write(OUTPUT, doc);
 
 console.log(`Wrote ${OUTPUT}`);
-console.log(`  grid ${nx}x${ny}x${nz}  cs ${CS}m ch ${CH}m iso ${ISO}  (kept ${kept.toLocaleString()} / ${num.toLocaleString()} splats)`);
+console.log(
+    `  grid ${nx}x${ny}x${nz}  cs ${CS}m ch ${CH}m iso ${ISO}  (kept ${kept.toLocaleString()} / ${num.toLocaleString()} splats)`,
+);
 console.log(`  verts ${positions.length / 3}  tris ${indices.length / 3}`);

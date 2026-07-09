@@ -7,7 +7,7 @@
  * physics collider, and the navmesh (both baked at build time by scripts/), so
  * all three stay aligned.
  *
- * To retune: change this value, then re-run `pnpm build:collider` and
+ * To retune: change this value, then re-run `pnpm build:collision-mesh-glb` and
  * `pnpm build:navmesh` (the splat picks it up automatically on reload).
  */
 export const WORLD_SCALE = 1;

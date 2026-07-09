@@ -2,10 +2,15 @@ import {
     addBroadphaseLayer,
     addObjectLayer,
     type BodyId,
-    box,
+    CastRayStatus,
+    castRay,
+    createClosestCastRayCollector,
+    createDefaultCastRaySettings,
     createWorld,
     createWorldSettings,
     enableCollision,
+    type Filter,
+    filter,
     MotionType,
     registerAll,
     rigidBody,
@@ -13,8 +18,9 @@ import {
     updateWorld,
     type World,
 } from 'crashcat';
-import type { Collider } from './collider-schema';
-import { FLOOR_HALF_EXTENTS, FLOOR_Y, GRAVITY } from './scene';
+import type { Vec3 } from 'mathcat';
+import type { Collider } from './collider';
+import { GRAVITY } from './scene';
 
 // Register all shapes & constraints up front. Simplest during development; swap
 // for granular registerShapes/registerConstraints later for better tree-shaking.
@@ -41,14 +47,6 @@ export type Physics = {
 
 export function initPhysics(): Physics {
     const world = createWorld(settings);
-
-    rigidBody.create(world, {
-        shape: box.create({ halfExtents: FLOOR_HALF_EXTENTS }),
-        position: [0, FLOOR_Y, 0],
-        motionType: MotionType.STATIC,
-        objectLayer: OBJECT_LAYER_NOT_MOVING,
-    });
-
     return { world };
 }
 
@@ -76,4 +74,35 @@ export function createSplatCollider(physics: Physics, collider: Collider): BodyI
     });
 
     return body.id;
+}
+
+// Reused scratch for ground raycasts (one per pedestrian per frame — avoid allocs).
+const _rayCollector = createClosestCastRayCollector();
+const _raySettings = createDefaultCastRaySettings();
+let _rayFilter: Filter | null = null;
+const _rayOrigin: Vec3 = [0, 0, 0];
+const _rayDown: Vec3 = [0, -1, 0];
+
+// Vertical search window around the probe height. The navmesh Y is close to the
+// real surface, so a metre up / two down comfortably brackets curbs and slopes.
+const GROUND_RAY_UP = 1.0;
+const GROUND_RAY_DOWN = 2.0;
+
+/**
+ * World-space ground height under (x, z), found by casting a short downward ray at
+ * the static collider from `nearY + GROUND_RAY_UP`. Returns the hit Y, or null if
+ * nothing is hit in the window (off the mesh, or over a gap) so the caller can fall
+ * back to the navmesh height.
+ */
+export function groundHeight(physics: Physics, x: number, z: number, nearY: number): number | null {
+    if (!_rayFilter) _rayFilter = filter.forWorld(physics.world);
+    _rayOrigin[0] = x;
+    _rayOrigin[1] = nearY + GROUND_RAY_UP;
+    _rayOrigin[2] = z;
+    const length = GROUND_RAY_UP + GROUND_RAY_DOWN;
+
+    _rayCollector.reset();
+    castRay(physics.world, _rayCollector, _raySettings, _rayOrigin, _rayDown, length, _rayFilter);
+    if (_rayCollector.hit.status !== CastRayStatus.COLLIDING) return null;
+    return _rayOrigin[1] - _rayCollector.hit.fraction * length;
 }
