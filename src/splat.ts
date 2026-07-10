@@ -32,7 +32,12 @@ export function createSplat(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
     });
     scene.add(spark);
 
-    const mesh = new SplatMesh({ url: encodeURI(SPLAT_URL) });
+    // `paged: true` makes this an LOD-streaming (paged) mesh, which is what
+    // activates the SparkRenderer's paging budget (pagedExtSplats / maxPagedSplats,
+    // see src/performance.ts). Without it the whole .rad loads resident and that
+    // budget is inert. Paging streams pages from the .rad rootUrl via HTTP range
+    // requests, so the host must support them.
+    const mesh = new SplatMesh({ url: encodeURI(SPLAT_URL), paged: true });
     // Shrink the splat to human scale; collider + navmesh are baked at the same
     // scale (see src/world-scale.ts) so everything lines up.
     mesh.scale.setScalar(WORLD_SCALE);
