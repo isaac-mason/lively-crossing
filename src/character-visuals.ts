@@ -61,6 +61,16 @@ export async function loadCharacterVisuals(visuals: CharacterVisuals): Promise<v
                 const gltf = await loader.loadAsync(`${BASE}characters/${name}.glb`);
                 gltf.scene.traverse((o) => {
                     o.frustumCulled = false; // skinned bounds are unreliable -> avoid cull flicker
+                    const mesh = o as THREE.Mesh;
+                    // Cast into the sun's shadow map (the collider shadow catcher
+                    // receives it) and receive too, so pedestrians self-shadow and
+                    // shadow each other. SkeletonUtils.clone copies both flags, so
+                    // every cloned pedestrian inherits them. (Splats never cast, so
+                    // buildings don't shadow the crowd — only characters do.)
+                    if (mesh.isMesh) {
+                        mesh.castShadow = true;
+                        mesh.receiveShadow = true;
+                    }
                 });
                 visuals.templates.set(name, { scene: gltf.scene, clips: gltf.animations });
             } catch (err) {

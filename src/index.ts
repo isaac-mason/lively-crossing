@@ -8,6 +8,7 @@ import { initNavigation, loadNavigation, updateCrowd, updateNavigation } from '.
 import { applyPerformance, initPerformance } from './performance';
 import { createSplatCollider, initPhysics, updatePhysics } from './physics';
 import { CAMERA_POSITION, CAMERA_TARGET, COLLIDER_URL } from './scene';
+import { attachShadowCatcher, initShadows, updateShadows } from './shadows';
 import { createSplat } from './splat';
 import './style.css';
 
@@ -19,10 +20,6 @@ function init() {
     const hemiLight = new THREE.HemisphereLight(0xbfd4ff, 0x505058, 1.4);
     scene.add(hemiLight);
 
-    const sun = new THREE.DirectionalLight(0xfff2e0, 2.6);
-    sun.position.set(6, 12, 4);
-    scene.add(sun);
-
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(CAMERA_POSITION[0], CAMERA_POSITION[1], CAMERA_POSITION[2]);
 
@@ -32,6 +29,10 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     const app = document.querySelector<HTMLDivElement>('#app') ?? document.body;
     app.appendChild(renderer.domElement);
+
+    // Sun shadows for the crowd (creates the shadow-casting sun + enables shadow
+    // mapping). The collider catcher is attached later, once it has loaded.
+    const shadows = initShadows(scene, renderer);
 
     // SparkRenderer + the scene's SplatMesh (LOD cone, quality budget, world scale).
     const { spark, mesh: splat } = createSplat(scene, renderer);
@@ -73,6 +74,7 @@ function init() {
         scene,
         camera,
         renderer,
+        shadows,
         spark,
         splat,
         controls,
@@ -95,6 +97,10 @@ async function load(state: State) {
     state.collider = await loadColliderGLB(COLLIDER_URL);
     console.log(`collider loaded: ${state.collider.positions.length / 3} verts, ${state.collider.indices.length / 3} tris`);
 
+    // The collider mesh doubles as the invisible shadow catcher for the crowd
+    // (splats can't receive shadows themselves).
+    attachShadowCatcher(state.scene, state.collider.object);
+
     // Add the scene geometry to the physics world as a static triangle mesh.
     createSplatCollider(state.physics, state.collider);
 
@@ -112,6 +118,9 @@ function update(state: State, dt: number, _time: number) {
 
     updatePhysics(state.physics, dt);
     state.controls.update();
+
+    // Keep the sun's shadow frustum centred on where the camera is looking.
+    updateShadows(state.shadows, state.controls.target);
 
     // Push runtime perf settings (LOD budget, …) onto the renderer.
     applyPerformance(state.perf, state.spark);

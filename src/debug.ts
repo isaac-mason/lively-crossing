@@ -4,7 +4,6 @@ import * as THREE from 'three';
 
 import type { Performance } from './performance';
 import { WIND_SPHERES } from './wind';
-import { WORLD_SCALE } from './world-scale';
 
 export type DebugOverlay = {
     element: HTMLDivElement;
@@ -144,8 +143,8 @@ export function createDebugOverlay(perf: Performance): DebugOverlay {
         depthWrite: false,
     });
     for (const s of WIND_SPHERES) {
-        const sphere = new THREE.Mesh(new THREE.SphereGeometry(s.radius * WORLD_SCALE, 20, 14), windSphereMat);
-        sphere.position.set(s.center[0] * WORLD_SCALE, s.center[1] * WORLD_SCALE, s.center[2] * WORLD_SCALE);
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(s.radius, 20, 14), windSphereMat);
+        sphere.position.set(s.center[0], s.center[1], s.center[2]);
         sphere.renderOrder = 999;
         sphere.raycast = () => {}; // don't let click-to-raycast hit the debug volume
         windSpheres.add(sphere);

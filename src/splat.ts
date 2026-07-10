@@ -4,7 +4,6 @@ import type * as THREE from 'three';
 import { getSparkQualityOptions } from './performance';
 import { SPLAT_URL } from './scene';
 import { applyWind } from './wind';
-import { WORLD_SCALE } from './world-scale';
 
 export type Splat = {
     /** Drives splat sorting + LOD streaming; also carries the runtime perf knobs. */
@@ -38,9 +37,7 @@ export function createSplat(scene: THREE.Scene, renderer: THREE.WebGLRenderer): 
     // budget is inert. Paging streams pages from the .rad rootUrl via HTTP range
     // requests, so the host must support them.
     const mesh = new SplatMesh({ url: encodeURI(SPLAT_URL), paged: true });
-    // Shrink the splat to human scale; collider + navmesh are baked at the same
-    // scale (see src/world-scale.ts) so everything lines up.
-    mesh.scale.setScalar(WORLD_SCALE);
+
     scene.add(mesh);
 
     // Wind/sway: a per-splat vertex modifier (Spark's answer to PlayCanvas's

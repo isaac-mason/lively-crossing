@@ -30,7 +30,6 @@ import {
     type Vec3,
 } from 'navcat';
 import { floodFillNavMesh, generateSoloNavMesh, type SoloNavMeshOptions } from 'navcat/blocks';
-import { WORLD_SCALE } from '../src/world-scale.ts';
 
 // --- Pruning: keep only polys reachable from a seed point AND within a radius ---
 // Seed sits at the intersection the player/crowd use; everything not connected to
@@ -258,12 +257,9 @@ async function main() {
                 const x = src[i * 3];
                 const y = src[i * 3 + 1];
                 const z = src[i * 3 + 2];
-                // Bake in the uniform world scale so the navmesh matches the
-                // scaled collider + splat (see src/world-scale.ts). The collider GLB
-                // is already world-frame + cropped, so this is a straight copy.
-                positions.push((m[0] * x + m[4] * y + m[8] * z + m[12]) * WORLD_SCALE);
-                positions.push((m[1] * x + m[5] * y + m[9] * z + m[13]) * WORLD_SCALE);
-                positions.push((m[2] * x + m[6] * y + m[10] * z + m[14]) * WORLD_SCALE);
+                positions.push((m[0] * x + m[4] * y + m[8] * z + m[12]));
+                positions.push((m[1] * x + m[5] * y + m[9] * z + m[13]));
+                positions.push((m[2] * x + m[6] * y + m[10] * z + m[14]));
             }
 
             const idx = indexAccessor.getArray();

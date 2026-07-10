@@ -16,7 +16,6 @@ import { Document, NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { meshopt } from '@gltf-transform/functions';
 import { MeshoptEncoder } from 'meshoptimizer';
-import { WORLD_SCALE } from '../src/world-scale.ts';
 
 const TRIANGLES = 4; // glTF primitive mode
 
@@ -56,9 +55,9 @@ async function main() {
                 const y = pos[i * 3 + 1];
                 const z = pos[i * 3 + 2];
                 positions.push(
-                    (m[0] * x + m[4] * y + m[8] * z + m[12]) * WORLD_SCALE,
-                    (m[1] * x + m[5] * y + m[9] * z + m[13]) * WORLD_SCALE,
-                    (m[2] * x + m[6] * y + m[10] * z + m[14]) * WORLD_SCALE,
+                    (m[0] * x + m[4] * y + m[8] * z + m[12]),
+                    (m[1] * x + m[5] * y + m[9] * z + m[13]),
+                    (m[2] * x + m[6] * y + m[10] * z + m[14]),
                 );
             }
 

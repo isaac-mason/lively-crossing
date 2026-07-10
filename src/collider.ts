@@ -14,6 +14,13 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 export type Collider = {
     positions: Float32Array; // world-space xyz triples
     indices: Uint32Array;
+    /**
+     * The loaded GLB scene, already world-placed. Kept alongside the decoded
+     * geometry so other systems can reuse the collision mesh as a render surface —
+     * notably the shadow catcher (see src/shadows.ts), since Gaussian splats can't
+     * receive shadows themselves.
+     */
+    object: THREE.Object3D;
 };
 
 export async function loadColliderGLB(url: string): Promise<Collider> {
@@ -48,5 +55,9 @@ export async function loadColliderGLB(url: string): Promise<Collider> {
         base += pos.count;
     });
 
-    return { positions: new Float32Array(positions), indices: new Uint32Array(indices) };
+    return {
+        positions: new Float32Array(positions),
+        indices: new Uint32Array(indices),
+        object: gltf.scene,
+    };
 }
